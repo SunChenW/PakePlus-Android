@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>短视频播放器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease-out;
+        }
+
+        .video-wrapper {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .upload-area {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            z-index: 100;
+            padding: 20px;
+            max-width: 90%;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+            margin-bottom: 10px;
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .upload-btn:active {
+            transform: scale(0.95);
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            opacity: 0.7;
+            line-height: 1.6;
+            margin-top: 15px;
+        }
+
+        .browser-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .browser-warning strong {
+            color: #ffc107;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            padding: 20px;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .controls.show {
+            opacity: 1;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        .control-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .play-pause-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 10px;
+        }
+
+        .time-display {
+            color: white;
+            font-size: 14px;
+        }
+
+        .video-info {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            color: white;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .video-info.show {
+            opacity: 1;
+        }
+
+        .video-title {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .swipe-hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 48px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 200;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .upload-btn {
+                padding: 12px 30px;
+                font-size: 16px;
+            }
+
+            .controls {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="upload-area" id="uploadArea">
+            <button class="upload-btn" id="selectBtn" onclick="handleFileSelect()">
+                📹 选择视频文件
+            </button>
+            <p class="upload-hint">
+                支持多选 • MP4/MOV/AVI等格式
+            </p>
+            <div class="browser-warning" id="browserWarning" style="display: none;">
+                <strong>⚠️ 浏览器限制提示</strong><br>
+                如果无法选择文件,建议:<br>
+                1. 使用 Chrome/Edge 浏览器<br>
+                2. 或将视频分享到此页面
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.avi,.wmv,.flv,.mkv"
+            multiple style="display: none;">
+
+        <div class="video-container" id="videoContainer"></div>
+
+        <div class="controls" id="controls">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="control-buttons">
+                <button class="play-pause-btn" id="playPauseBtn">▶️</button>
+                <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+            </div>
+        </div>
+
+        <div class="video-info" id="videoInfo">
+            <div class="video-title" id="videoTitle"></div>
+        </div>
+
+        <div class="swipe-hint" id="swipeHint"></div>
+    </div>
+
+    <script>
+        document.addEventListener('plusready', function () {
+            //console.log("所有plus api都应该在此事件发生后调用，否则会出现plus is undefined。")
+        });
+        // 全局变量
+        let videos = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let startY = 0;
+        let currentY = 0;
+        let isSwiping = false;
+        let controlsTimeout = null;
+        let videoElements = {};
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const videoContainer = document.getElementById('videoContainer');
+        const controls = document.getElementById('controls');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const videoInfo = document.getElementById('videoInfo');
+        const videoTitle = document.getElementById('videoTitle');
+        const swipeHint = document.getElementById('swipeHint');
+        const selectBtn = document.getElementById('selectBtn');
+        const browserWarning = document.getElementById('browserWarning');
+
+
+        // 处理文件选择
+        function handleFileSelect() {
+            console.log('尝试打开文件选择器');
+
+            // 检测是否在H5+ App环境中
+            if (typeof plus !== 'undefined') {
+                useH5PlusGallery();
+            } else if ('showOpenFilePicker' in window) {
+                // 优先使用现代API
+                useModernFilePicker();
+            } else {
+                // 降级到传统input
+                fileInput.click();
+            }
+        }
+
+        // 使用H5+相册选择器
+        function useH5PlusGallery() {
+            console.log('使用H5+相册选择器');
+            
+            plus.gallery.pick(function(e) {
+                console.log('选择的文件:', e.files);
+                
+                // 将选中的文件转换为File对象
+                const files = [];
+                let processedCount = 0;
+                const totalCount = e.files.length;
+                
+                e.files.forEach(function(filePath) {
+                    // 使用plus.io读取文件
+                    plus.io.resolveLocalFileSystemURL(filePath, function(entry) {
+                        entry.file(function(file) {
+                            files.push(file);
+                            processedCount++;
+                            
+                            // 所有文件处理完成后
+                            if (processedCount === totalCount) {
+                                processFiles(files);
+                            }
+                        }, function(err) {
+                            console.error('读取文件失败:', err);
+                            processedCount++;
+                            if (processedCount === totalCount && files.length > 0) {
+                                processFiles(files);
+                            }
+                        });
+                    }, function(err) {
+                        console.error('解析文件路径失败:', err);
+                        processedCount++;
+                        if (processedCount === totalCount && files.length > 0) {
+                            processFiles(files);
+                        }
+                    });
+                });
+                
+                // 如果没有选择文件
+                if (totalCount === 0) {
+                    console.log('未选择任何文件');
+                }
+            }, function(err) {
+                console.error('选择文件失败:', err);
+                // 用户取消或其他错误
+                if (err.code !== 12) { // 12表示用户取消
+                    alert('选择文件失败: ' + err.message);
+                }
+            }, {
+                filter: 'video',  // 只显示视频文件
+                multiple: true,   // 支持多选
+                maximum: 50,      // 最多选择50个文件
+                system: false     // 使用系统相册
+            });
+        }
+
+        // 使用现代文件选择器API
+        async function useModernFilePicker() {
+            try {
+                const options = {
+                    types: [{
+                        description: '视频文件',
+                        accept: {
+                            'video/*': ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv']
+                        }
+                    }],
+                    multiple: true
+                };
+
+                const fileHandles = await window.showOpenFilePicker(options);
+                const files = await Promise.all(fileHandles.map(handle => handle.getFile()));
+
+                processFiles(files);
+            } catch (err) {
+                console.error('现代API失败,降级到传统方式:', err);
+                // 用户取消选择或其他错误，不一定要降级，视情况而定
+                if (err.name !== 'AbortError') {
+                    fileInput.click();
+                }
+            }
+        }
+
+        // 处理选择的文件
+        function processFiles(files) {
+            console.log('处理', files.length, '个文件');
+
+            let videoCount = 0;
+            files.forEach(file => {
+                console.log('文件:', file.name, '类型:', file.type, '大小:', file.size);
+                if (file.type.startsWith('video/')) {
+                    const url = URL.createObjectURL(file);
+                    videos.push({
+                        url: url,
+                        name: file.name,
+                        file: file
+                    });
+                    videoCount++;
+                } else {
+                    console.warn('跳过非视频文件:', file.name);
+                }
+            });
+
+            if (videos.length > 0) {
+                console.log('成功加载', videos.length, '个视频');
+                uploadArea.style.display = 'none';
+                loadVideos();
+                showControls();
+            } else {
+                alert('未找到有效的视频文件,请重新选择');
+            }
+        }
+
+        // 文件选择处理(传统方式)
+        fileInput.addEventListener('change', function (e) {
+            console.log('文件选择事件触发');
+            console.log('选择的文件数量:', e.target.files.length);
+
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                processFiles(files);
+            } else {
+                console.log('未选择任何文件');
+            }
+
+            // 清空input,允许重复选择同一文件
+            this.value = '';
+        });
+
+        // 加载视频
+        function loadVideos() {
+            videoContainer.innerHTML = '';
+            videos.forEach((video, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'video-wrapper';
+                wrapper.style.transform = `translateY(${index * 100}%)`;
+
+                const videoEl = document.createElement('video');
+                videoEl.src = video.url;
+                videoEl.loop = true;
+                videoEl.preload = 'metadata';
+                videoEl.playsInline = true;
+                videoEl.webkitPlaysInline = true;
+
+                videoEl.addEventListener('loadedmetadata', function () {
+                    updateTimeDisplay();
+                });
+
+                videoEl.addEventListener('timeupdate', function () {
+                    updateProgress();
+                });
+
+                videoEl.addEventListener('ended', function () {
+                    if (videos.length === 1) {
+                        videoEl.currentTime = 0;
+                        videoEl.play();
+                    }
+                });
+
+                videoElements[index] = videoEl;
+                wrapper.appendChild(videoEl);
+                videoContainer.appendChild(wrapper);
+            });
+
+            updateVideoPosition();
+            if (videos.length > 0) {
+                playCurrentVideo();
+            }
+        }
+
+        // 更新视频位置
+        function updateVideoPosition() {
+            const wrappers = videoContainer.querySelectorAll('.video-wrapper');
+            wrappers.forEach((wrapper, index) => {
+                wrapper.style.transform = `translateY(${(index - currentIndex) * 100}%)`;
+            });
+
+            updateVideoInfo();
+        }
+
+        // 播放当前视频
+        function playCurrentVideo() {
+            pauseAllVideos();
+            const videoEl = videoElements[currentIndex];
+            if (videoEl) {
+                videoEl.play().then(() => {
+                    isPlaying = true;
+                    updatePlayPauseBtn();
+                }).catch(err => {
+                    console.log('自动播放被阻止:', err);
+                    isPlaying = false;
+                    updatePlayPauseBtn();
+                });
+            }
+        }
+
+        // 暂停所有视频
+        function pauseAllVideos() {
+            Object.values(videoElements).forEach(videoEl => {
+                videoEl.pause();
+            });
+            isPlaying = false;
+            updatePlayPauseBtn();
+        }
+
+        // 更新播放暂停按钮
+        function updatePlayPauseBtn() {
+            playPauseBtn.textContent = isPlaying ? '⏸️' : '▶️';
+        }
+
+        // 更新视频信息
+        function updateVideoInfo() {
+            if (videos[currentIndex]) {
+                videoTitle.textContent = videos[currentIndex].name;
+                showVideoInfo();
+            }
+        }
+
+        // 显示控制栏
+        function showControls() {
+            controls.classList.add('show');
+            clearTimeout(controlsTimeout);
+            controlsTimeout = setTimeout(() => {
+                if (isPlaying) {
+                    controls.classList.remove('show');
+                    hideVideoInfo();
+                }
+            }, 3000);
+        }
+
+        // 隐藏视频信息
+        function hideVideoInfo() {
+            videoInfo.classList.remove('show');
+        }
+
+        // 显示视频信息
+        function showVideoInfo() {
+            videoInfo.classList.add('show');
+        }
+
+        // 更新进度条
+        function updateProgress() {
+            const videoEl = videoElements[currentIndex];
+            if (videoEl && videoEl.duration) {
+                const progress = (videoEl.currentTime / videoEl.duration) * 100;
+                progressFill.style.width = progress + '%';
+                updateTimeDisplay();
+            }
+        }
+
+        // 更新时间显示
+        function updateTimeDisplay() {
+            const videoEl = videoElements[currentIndex];
+            if (videoEl) {
+                const current = formatTime(videoEl.currentTime || 0);
+                const duration = formatTime(videoEl.duration || 0);
+                timeDisplay.textContent = `${current} / ${duration}`;
+            }
+        }
+
+        // 格式化时间
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // 播放暂停切换
+        playPauseBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            togglePlayPause();
+            showControls();
+        });
+
+        function togglePlayPause() {
+            const videoEl = videoElements[currentIndex];
+            if (videoEl) {
+                if (isPlaying) {
+                    videoEl.pause();
+                    isPlaying = false;
+                } else {
+                    videoEl.play();
+                    isPlaying = true;
+                }
+                updatePlayPauseBtn();
+            }
+        }
+
+        // 进度条点击跳转
+        progressBar.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const rect = progressBar.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            const videoEl = videoElements[currentIndex];
+            if (videoEl && videoEl.duration) {
+                videoEl.currentTime = pos * videoEl.duration;
+                showControls();
+            }
+        });
+
+        // 触摸事件处理
+        document.addEventListener('touchstart', function (e) {
+            startY = e.touches[0].clientY;
+            isSwiping = false;
+            showControls();
+        });
+
+        document.addEventListener('touchmove', function (e) {
+            if (!startY) return;
+
+            currentY = e.touches[0].clientY;
+            const diff = currentY - startY;
+
+            if (Math.abs(diff) > 50) {
+                isSwiping = true;
+            }
+        });
+
+        document.addEventListener('touchend', function (e) {
+            if (!isSwiping || !startY) {
+                // 点击事件，切换播放暂停
+                if (!isSwiping) {
+                    togglePlayPause();
+                }
+                startY = 0;
+                currentY = 0;
+                return;
+            }
+
+            const diff = currentY - startY;
+
+            if (Math.abs(diff) > 50) {
+                if (diff < 0) {
+                    // 上滑，随机下一个视频
+                    let nextIndex;
+                    do {
+                        nextIndex = Math.floor(Math.random() * videos.length);
+                    } while (nextIndex === currentIndex && videos.length > 1);
+                    currentIndex = nextIndex;
+                    showSwipeHint('↑');
+                } else if (diff > 0) {
+                    // 下滑，随机上一个视频
+                    let prevIndex;
+                    do {
+                        prevIndex = Math.floor(Math.random() * videos.length);
+                    } while (prevIndex === currentIndex && videos.length > 1);
+                    currentIndex = prevIndex;
+                    showSwipeHint('↓');
+                }
+
+                updateVideoPosition();
+                playCurrentVideo();
+            }
+
+            startY = 0;
+            currentY = 0;
+            isSwiping = false;
+        });
+
+        // 鼠标滚轮事件（桌面端）
+        let wheelTimeout = null;
+        document.addEventListener('wheel', function (e) {
+            if (wheelTimeout) return;
+
+            wheelTimeout = setTimeout(() => {
+                wheelTimeout = null;
+            }, 500);
+
+            if (e.deltaY > 0) {
+                // 向下滚动，随机下一个视频
+                let nextIndex;
+                do {
+                    nextIndex = Math.floor(Math.random() * videos.length);
+                } while (nextIndex === currentIndex && videos.length > 1);
+                currentIndex = nextIndex;
+                showSwipeHint('↑');
+                updateVideoPosition();
+                playCurrentVideo();
+            } else if (e.deltaY < 0) {
+                // 向上滚动，随机上一个视频
+                let prevIndex;
+                do {
+                    prevIndex = Math.floor(Math.random() * videos.length);
+                } while (prevIndex === currentIndex && videos.length > 1);
+                currentIndex = prevIndex;
+                showSwipeHint('↓');
+                updateVideoPosition();
+                playCurrentVideo();
+            }
+        });
+
+        // 显示滑动提示
+        function showSwipeHint(direction) {
+            swipeHint.textContent = direction;
+            swipeHint.style.opacity = '1';
+            swipeHint.style.transition = 'opacity 0.3s';
+
+            setTimeout(() => {
+                swipeHint.style.opacity = '0';
+            }, 500);
+        }
+
+        // 键盘事件
+        document.addEventListener('keydown', function (e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === 'ArrowUp') {
+                // 随机切换
+                let newIndex;
+                do {
+                    newIndex = Math.floor(Math.random() * videos.length);
+                } while (newIndex === currentIndex && videos.length > 1);
+                currentIndex = newIndex;
+                updateVideoPosition();
+                playCurrentVideo();
+            } else if (e.code === 'ArrowDown') {
+                // 随机切换
+                let newIndex;
+                do {
+                    newIndex = Math.floor(Math.random() * videos.length);
+                } while (newIndex === currentIndex && videos.length > 1);
+                currentIndex = newIndex;
+                updateVideoPosition();
+                playCurrentVideo();
+            }
+        });
+
+
+
+
+        // 防止页面滚动
+        document.addEventListener('touchmove', function (e) {
+            e.preventDefault();
+        }, { passive: false });
+
+
+
+    </script>
+</body>
+
+</html>
